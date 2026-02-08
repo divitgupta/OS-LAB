@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garbage Collection Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #3b82f6;
+            --accent-hover: #60a5fa;
+            --danger-color: #ef4444;
+            --danger-hover: #f87171;
+            --success-color: #10b981;
+            --success-hover: #34d399;
+            --border-color: #334155;
+            --input-bg: #020617;
+            --block-bg: #0f172a;
+            --block-allocated: #475569;
+            --block-border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.025em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Instructions */
+        .instructions {
+            background: #334155;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+            padding: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Heap Grid */
+        .heap-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        .block {
+            aspect-ratio: 1;
+            border: 2px solid var(--block-border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            background: var(--block-bg);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .block.allocated {
+            background-color: var(--block-allocated);
+            border-color: #64748b;
+            color: #f1f5f9;
+            transform: scale(0.98);
+        }
+
+        .block.marked {
+            background-color: #d97706;
+            /* Amber 600 */
+            border-color: #f59e0b;
+            color: white;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
+        }
+
+        /* Stack */
+        .stack-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 300px;
+            overflow-y: auto;
+            justify-content: flex-start;
+            align-items: center;
+            background: var(--bg-color);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px dashed var(--border-color);
+        }
+
+        .stack-item {
+            background: var(--card-bg);
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+            font-family: monospace;
+            font-weight: 600;
+            color: var(--text-primary);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .empty-state {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        /* Controls */
+        .control-group {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .control-group label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            width: 80px;
+        }
+
+        input[type="number"] {
+            width: 70px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="number"]:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: var(--success-hover);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+        }
+
+        .btn-secondary {
+            background-color: #334155;
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: #475569;
+        }
+
+        /* Actions Bar */
+        .actions-bar {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+            margin-top: 30px;
+        }
+
+        .actions-bar button {
+            padding: 10px 24px;
+            font-size: 1rem;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .status-item {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .status-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Inline Message Box */
+        .message-area {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            text-align: center;
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+
+        .message-area.success {
+            color: var(--success-hover);
+            border-color: var(--success-color);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .message-area.error {
+            color: var(--danger-hover);
+            border-color: var(--danger-color);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .message-area.info {
+            color: var(--accent-hover);
+            border-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>GC Simulator</h1>
+            <p class="subtitle">Mark & Sweep Garbage Collection Visualization</p>
+        </header>
+
+        <div class="instructions">
+            <strong>How to use:</strong> (1) Allocate blocks, (2) Push roots to stack, (3) Mark reachable blocks, (4)
+            Sweep garbage.
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Memory Heap</div>
+                    <div style="font-size: 0.9rem; color: var(--text-secondary);">Size: 20 Blocks</div>
+                </div>
+                <div class="heap-grid" id="heapGrid">
+                    <!-- Blocks injected here -->
+                </div>
+
+                <div
+                    style="margin-top: 20px; display: flex; gap: 20px; justify-content: center; font-size: 0.85rem; color: var(--text-secondary);">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span
+                            style="width: 12px; height: 12px; background: var(--block-bg); border: 2px solid var(--block-border); border-radius: 2px;"></span>
+                        Free
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span
+                            style="width: 12px; height: 12px; background: var(--block-allocated); border: 2px solid #64748b; border-radius: 2px;"></span>
+                        Allocated
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span
+                            style="width: 12px; height: 12px; background: #d97706; border: 2px solid #f59e0b; border-radius: 2px;"></span>
+                        Marked
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Operations</div>
+                </div>
+
+                <div class="control-group">
+                    <label>Allocate</label>
+                    <input type="number" id="allocateCount" min="1" max="20" value="3">
+                    <button class="btn-primary" onclick="allocateBlocks()">Alloc</button>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); margin-left: auto;">Blocks</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Root Ref</label>
+                    <input type="number" id="pushIndex" min="0" max="19" value="0">
+                    <button class="btn-success" onclick="pushReference()">Push</button>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); margin-left: auto;">Index</span>
+                </div>
+
+                <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                    <div class="card-title" style="margin-bottom: 15px; font-size: 1rem;">Process Stack (Roots)</div>
+                    <div class="stack-list" id="stackDisplay">
+                        <span class="empty-state">Stack Empty</span>
+                    </div>
+                    <button class="btn-danger" style="margin-top: 15px;" onclick="popReference()">Pop Top
+                        Reference</button>
+                </div>
+
+                <div id="messageArea" class="message-area">Ready</div>
+            </div>
+        </div>
+
+        <div class="actions-bar">
+            <button class="btn-primary" onclick="runGC()">Run Full GC Cycle</button>
+            <div style="width: 1px; background: var(--border-color);"></div>
+            <button class="btn-secondary" onclick="markPhase()">Mark Only</button>
+            <button class="btn-secondary" onclick="sweepPhase()">Sweep Only</button>
+            <button class="btn-secondary" onclick="resetAll()">Reset System</button>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-label">Allocated</div>
+                <div class="status-value" id="allocatedCount">0</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Marked</div>
+                <div class="status-value" id="markedCount">0</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Stack Depth</div>
+                <div class="status-value" id="stackCount">0</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">Current Phase</div>
+                <div class="status-value" id="currentPhase"
+                    style="font-size: 0.9rem; font-weight: 500; color: var(--accent-color);">Idle</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Removed toast container -->
+
+    <script>
+        const HEAP_SIZE = 20;
+        const STACK_SIZE = 20;
+
+        let heap = [];
+        let processStack = [];
+
+        async function fetchState() {
+            try {
+                const res = await fetch('/api/state');
+                const data = await res.json();
+                heap = data.heap;
+                processStack = data.stack;
+                renderHeap();
+                renderStack();
+                updateCounts();
+            } catch (e) {
+                console.error("Failed to fetch state:", e);
+                showToast("Connection to backend failed", "error");
+            }
+        }
+
+        function init() {
+            fetchState();
+        }
+
+        function renderHeap() {
+            const heapGrid = document.getElementById('heapGrid');
+            heapGrid.innerHTML = '';
+
+            heap.forEach((block, i) => {
+                const div = document.createElement('div');
+                div.className = 'block';
+                div.textContent = i;
+
+                if (block.marked) {
+                    div.classList.add('marked');
+                } else if (block.allocated) {
+                    div.classList.add('allocated');
+                }
+
+                heapGrid.appendChild(div);
+            });
+        }
+
+        function renderStack() {
+            const stackDisplay = document.getElementById('stackDisplay');
+
+            if (processStack.length === 0) {
+                stackDisplay.innerHTML = '<span class="empty-state">Stack Empty</span>';
+            } else {
+                stackDisplay.innerHTML = '';
+                [...processStack].reverse().forEach(idx => {
+                    const item = document.createElement('div');
+                    item.className = 'stack-item';
+                    item.textContent = `Ref -> Block ${idx}`;
+                    stackDisplay.appendChild(item);
+                });
+            }
+        }
+
+        let messageTimeout;
+        function showToast(text, type) {
+            const area = document.getElementById('messageArea');
+            area.textContent = text;
+            area.className = `message-area ${type}`;
+
+            if (messageTimeout) clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                area.textContent = 'Ready';
+                area.className = 'message-area';
+            }, 3000);
+        }
+
+        // Wrapper for legacy calls
+        function showMessage(text, type) {
+            showToast(text, type);
+        }
+
+        async function allocateBlocks() {
+            const count = parseInt(document.getElementById('allocateCount').value);
+
+            try {
+                const res = await fetch('/api/allocate', {
+                    method: 'POST',
+                    body: JSON.stringify({ count: count })
+                });
+                const data = await res.json();
+                heap = data.heap;
+                processStack = data.stack;
+
+                if (data.allocated_count < count) {
+                    showToast(`Allocated ${data.allocated_count} blocks (requested ${count}) - Heap Full`, 'error');
+                } else {
+                    showToast(`Allocated ${data.allocated_count} blocks successfully.`, 'success');
+                }
+
+                renderHeap();
+                updateCounts();
+            } catch (e) {
+                showToast('Allocation failed', 'error');
+            }
+        }
+
+        async function pushReference() {
+            const index = parseInt(document.getElementById('pushIndex').value);
+
+            try {
+                const res = await fetch('/api/push', {
+                    method: 'POST',
+                    body: JSON.stringify({ index: index })
+                });
+
+                if (res.status === 400) {
+                    const err = await res.json();
+                    showToast(err.error || 'Invalid index', 'error');
+                    return;
+                }
+
+                const data = await res.json();
+                heap = data.heap;
+                processStack = data.stack;
+
+                renderHeap();
+                renderStack();
+                updateCounts();
+                showToast('Reference added to stack.', 'success');
+            } catch (e) {
+                showToast('Push failed', 'error');
+            }
+        }
+
+        async function popReference() {
+            // Get top value for accurate messaging
+            if (processStack.length > 0) {
+                const topVal = processStack[processStack.length - 1]; // Top is end of array
+                // But wait, my processStack is array of values.
+            }
+
+            try {
+                const res = await fetch('/api/pop', { method: 'POST' });
+                const data = await res.json();
+
+                // Diff check to find popped value? Or just use last state?
+                // Let's use generic message matching EL.c slightly modified or best effort
+
+                heap = data.heap;
+                processStack = data.stack;
+
+                renderHeap();
+                renderStack();
+                updateCounts();
+                showToast('Reference removed from stack.', 'info');
+            } catch (e) {
+                showToast('Pop failed', 'error');
+            }
+        }
+
+        async function markPhase() {
+            try {
+                const res = await fetch('/api/mark', { method: 'POST' });
+                const data = await res.json();
+                heap = data.heap;
+                processStack = data.stack;
+
+                renderHeap();
+                updateCounts();
+                updatePhase('Mark Phase Complete');
+                showToast('Mark phase completed', 'success');
+            } catch (e) {
+                showToast('Mark phase failed', 'error');
+            }
+        }
+
+        async function sweepPhase() {
+            try {
+                const res = await fetch('/api/sweep', { method: 'POST' });
+                const data = await res.json();
+                heap = data.heap;
+                processStack = data.stack;
+
+                renderHeap();
+                updateCounts();
+                updatePhase('Sweep Phase Complete');
+                showToast('Garbage collected', 'success');
+
+                setTimeout(clearMarks, 2000);
+            } catch (e) {
+                showToast('Sweep phase failed', 'error');
+            }
+        }
+
+        async function clearMarks() {
+            try {
+                const res = await fetch('/api/clear_marks', { method: 'POST' });
+                const data = await res.json();
+                heap = data.heap;
+                processStack = data.stack;
+
+                renderHeap();
+                updateCounts();
+                updatePhase('Ready');
+            } catch (e) {
+                showToast('Failed to clear marks', 'error');
+            }
+        }
+
+        async function runGC() {
+            updatePhase('Running GC...');
+            showToast('Starting Mark & Sweep cycle...', 'info');
+
+            await sleep(500);
+            await markPhase();
+
+            await sleep(1500);
+            await sweepPhase();
+        }
+
+        function updateCounts() {
+            if (!heap) return;
+            document.getElementById('allocatedCount').textContent = heap.filter(b => b.allocated).length;
+            document.getElementById('markedCount').textContent = heap.filter(b => b.marked).length;
+            document.getElementById('stackCount').textContent = processStack.length;
+        }
+
+        function updatePhase(phase) {
+            document.getElementById('currentPhase').textContent = phase;
+        }
+
+        async function resetAll() {
+            try {
+                const res = await fetch('/api/reset', { method: 'POST' });
+                const data = await res.json();
+                heap = data.heap;
+                processStack = data.stack;
+
+                renderHeap();
+                renderStack();
+                updateCounts();
+                updatePhase('System Reset');
+                showToast('System reset', 'info');
+            } catch (e) {
+                showToast('Reset failed', 'error');
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

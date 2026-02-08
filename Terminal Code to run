@@ -1,0 +1,2 @@
+clang mongoose_server.c mongoose.c gc_core.c -o server
+./server

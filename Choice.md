@@ -1,3 +1,13 @@
+
+## Why Mark-and-Sweep?
+
+**Problem Solved**: Circular references (A→B, B→A, but no root→A)
+- **Reference Counting**: Would leak (counts never reach 0)
+- **Mark-and-Sweep**: Correctly identifies as garbage ✓
+
+**Trade-off**: "Stop-the-world" pause during GC
+- **Solution in Production**: Incremental/Concurrent marking (Java G1, Python)
+
 ---
 
 ## Design Choices: Why This Approach?
